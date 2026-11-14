@@ -128,9 +128,21 @@ Walk the three numbered comments: send everything, stop if no tool
 calls, run tools and append results. Then:
 
 ```bash
-python nano_agent.py --verbose "The tests in shop/ are failing. Find the bug and fix it."
+scripts/nano_traced.sh "The tests in shop/ are failing. Find the bug and fix it."
 python -m pytest shop -q
 ```
+
+This is `python nano_agent.py --verbose "..."` sent through the same
+tracer. In the dashboard open the newest row, click **Trace**, pick
+Turn 1 and put it next to Claude Code's Turn 1:
+
+- **4 tools** instead of about 34.
+- One-line **System Prompt**.
+- About 250 input tokens instead of about 52,000.
+- Same shape: tool call in the response, tool result in the next request.
+
+Backup copy: `backup/nano_trace.html`. If the tracer misbehaves, run
+`python nano_agent.py --verbose "..."` directly; the terminal shows the loop.
 
 Expect about 7 requests in 10 s. Point at `sending N messages` growing each request: same context
 growth, same loop, 89 lines. It runs on an OpenAI model: the loop does

@@ -68,7 +68,7 @@ def main():
 
         # 2. No tool calls means the model is done: print the answer and stop.
         if not reply.tool_calls:
-            print("\n" + reply.content)
+            print("\n" + (reply.content or "(no text)"))
             return
 
         # 3. The model only asked. We run each tool and send the results back.

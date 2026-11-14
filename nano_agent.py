@@ -53,7 +53,7 @@ TOOLS = [
 
 def main():
     task = " ".join(arg for arg in sys.argv[1:] if arg != "--verbose")
-    client = openai.OpenAI()  # reads OPENAI_API_KEY
+    client = openai.OpenAI(timeout=30)  # reads OPENAI_API_KEY
     messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": task}]
 
     # The loop. This is the whole agent.

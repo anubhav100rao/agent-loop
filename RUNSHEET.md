@@ -11,17 +11,20 @@ scripts/reset.sh && scripts/check.sh  # must print READY
 Screen: terminal on the left, browser on the right, both at large font
 (terminal 20pt+, browser zoom 150%).
 
-Record the backup now, with one clean run of step 2:
+Run all commands from a normal terminal (Terminal.app / iTerm), not from
+a shell inside the Claude desktop app: that shell's environment breaks
+the `claude` login.
+
+Backups already exist from a clean headless run (8 requests, 26 s):
+`backup/trace.html` (full trace, open in a browser) and
+`backup/run.typescript` (terminal output, `cat` it). If the network dies
+on stage, use those. To re-record:
 
 ```bash
-script -q backup/run.typescript claude-tap -- --strict-mcp-config --mcp-config .mcp.json
-# type the task, wait for it to finish, /exit
+script -q backup/run.typescript claude-tap -- --model sonnet --strict-mcp-config --mcp-config .mcp.json -p "<the task>"
 claude-tap export <session id printed at exit> --format html -o backup/trace.html
 scripts/reset.sh
 ```
-
-If the network dies on stage: open `backup/trace.html` in the browser and
-replay the terminal with `cat backup/run.typescript`.
 
 Note: request #1 contains your account email and git name in a
 `<system-reminder>` block. It will be on the projector.
@@ -34,7 +37,7 @@ word?" Take three guesses out loud. Write the highest on the board.
 ## 1:00-3:00  Run the task
 
 ```bash
-claude-tap -- --strict-mcp-config --mcp-config .mcp.json
+claude-tap -- --model sonnet --strict-mcp-config --mcp-config .mcp.json
 ```
 
 The dashboard opens at http://127.0.0.1:19527. Leave it; go back to the
@@ -56,11 +59,13 @@ cat mock_mcp/comments.json
 
 In the dashboard: click the newest row in **Conversation Log**, then the
 **Trace** button (top left of the session page). In the left list set
-ORDER to **Turn** and click the first turn that shows **35 tools**
-(earlier turns with no tools are housekeeping calls; skip them).
+ORDER to **Turn** and click the first turn whose **Tools** badge shows
+about 34 tools (skip any earlier turn with no tools: housekeeping calls).
 
 - Point at the counters under the buttons: **Input / Cache Read /
-  Cache Create**. Their sum is the answer to the guess.
+  Cache Create**. Their sum is the answer to the guess. In the dry
+  runs it was about 52,000 tokens (2 input + 39,894 cache read + 12,203
+  cache create), for a two-line prompt.
 - Scroll the **System Prompt** panel top to bottom, slowly, without
   reading it.
 - Scroll to the very bottom: the last message is the two lines you typed.
@@ -69,14 +74,14 @@ Point: most of the request is not your prompt.
 
 ## 5:00-7:00  Tools + MCP
 
-Same turn. Click the **Tools** header (badge says **35 tools**) to expand.
+Same turn. Click the **Tools** header to expand.
 
 - Open **Bash**: a name, a description, a JSON schema.
 - Scroll to **mcp__tracker__get_ticket**: a name, a description, a JSON
   schema. Show `mock_mcp/tracker_server.py` next to it: the docstring is
   the description, the type hints are the schema.
 
-Point: an MCP tool is just another JSON schema in the list. 32 built in,
+Point: an MCP tool is just another JSON schema in the list. About 31 built in,
 3 ours.
 
 ## 7:00-9:00  Context growth
@@ -85,7 +90,7 @@ Click the next turn in the left list, then **Diff with Prev**. Repeat for
 the turn after that.
 
 - The diff only adds: one assistant message, one tool result.
-- System prompt and all 35 tools are sent again every time.
+- System prompt and all the tools are sent again every time.
 - Read out the Input + Cache Read number on each turn as it climbs.
 
 Point: every turn resends everything. This is where cost and context
@@ -95,11 +100,15 @@ limits come from. (Cache Read is why it is affordable.)
 
 Click through the turns in order and read only the last message of each:
 
-1. response: `tool_use` mcp__tracker__get_ticket
+1. response: `tool_use` mcp__tracker__get_ticket (often with
+   list_recent_deploys)
 2. request: `tool_result` with the ticket JSON
-3. response: `tool_use` Read `shop/cart.py`
-4. ... Bash pytest, Edit, Bash pytest, mcp__tracker__add_comment
+3. response: `tool_use` Read `shop/cart.py` and `shop/test_cart.py`
+4. Bash pytest (1 failed), Edit, Bash pytest (5 passed),
+   mcp__tracker__add_comment
 5. last turn: plain text, no `tool_use`. The loop ends.
+
+This was the order in all three dry runs (8-9 requests, 26-32 s).
 
 For one turn click **Request JSON** to show there is nothing else in it.
 
@@ -123,7 +132,7 @@ python nano_agent.py --verbose "The tests in shop/ are failing. Find the bug and
 python -m pytest shop -q
 ```
 
-Point at `sending N messages` growing by 2 each request: same context
+Expect about 7 requests in 10 s. Point at `sending N messages` growing each request: same context
 growth, same loop, 89 lines. It runs on an OpenAI model: the loop does
 not care whose model is underneath.
 

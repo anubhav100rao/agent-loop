@@ -5,7 +5,7 @@ PY=.venv/bin/python
 fail() { echo "FAIL: $1"; exit 1; }
 
 [ -x "$PY" ] || fail "no .venv (see README setup)"
-$PY -c "import mcp, anthropic, pytest" 2>/dev/null || fail "python deps missing"
+$PY -c "import mcp, openai, pytest" 2>/dev/null || fail "python deps missing"
 [ -x .venv/bin/claude-tap ] || fail "claude-tap not installed"
 command -v claude >/dev/null || fail "claude CLI not on PATH"
 echo "ok: deps installed"
@@ -24,5 +24,5 @@ echo "ok: tracker MCP server lists 3 tools"
 [ "$(cat mock_mcp/comments.json)" = "[]" ] || fail "comments not empty (run scripts/reset.sh)"
 echo "ok: ticket comments empty"
 
-[ -n "$ANTHROPIC_API_KEY" ] || echo "WARN: ANTHROPIC_API_KEY not set (nano_agent.py needs it)"
+[ -n "$OPENAI_API_KEY" ] || echo "WARN: OPENAI_API_KEY not set (nano_agent.py needs it)"
 echo "READY"

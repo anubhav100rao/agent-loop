@@ -4,7 +4,7 @@
 
 ```bash
 cd xray-demo && source .venv/bin/activate
-export ANTHROPIC_API_KEY=...          # for nano_agent.py only
+set -a; . ../.env; set +a; export OPENAI_API_KEY=$OPEN_AI_API_KEY  # nano_agent.py only
 scripts/reset.sh && scripts/check.sh  # must print READY
 ```
 
@@ -124,7 +124,8 @@ python -m pytest shop -q
 ```
 
 Point at `sending N messages` growing by 2 each request: same context
-growth, same loop, 89 lines.
+growth, same loop, 89 lines. It runs on an OpenAI model: the loop does
+not care whose model is underneath.
 
 ## 14:00-15:00  Close
 
@@ -139,5 +140,6 @@ and watch them coordinate. Hand back to the founders.
 | Claude Code asks to log in | `/login`, or switch to `backup/trace.html` |
 | Tracker tools missing in Tools list | `scripts/check.sh`; restart the `claude-tap` command |
 | Task wanders past 90 s | Esc, `scripts/reset.sh`, use the backup trace |
-| nano agent errors on model ID | `MODEL=<id from docs> python nano_agent.py ...` |
+| nano agent errors on model ID | `MODEL=gpt-4.1-mini python nano_agent.py ...` |
+| nano agent says 429 / no credits | add credits at platform.openai.com; walk the code only |
 | Dashboard did not open | open http://127.0.0.1:19527 by hand |

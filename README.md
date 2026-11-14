@@ -8,7 +8,7 @@ model, then run the same loop in 89 lines (`nano_agent.py`).
 ```bash
 uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt
 source .venv/bin/activate
-export ANTHROPIC_API_KEY=...   # only nano_agent.py needs this
+set -a; . ../.env; set +a; export OPENAI_API_KEY=$OPEN_AI_API_KEY   # only nano_agent.py needs this
 claude                         # once: accept the trust dialog, /login if asked
 scripts/check.sh               # must end with READY
 ```

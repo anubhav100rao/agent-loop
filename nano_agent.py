@@ -1,11 +1,12 @@
 """nano_agent.py: a coding agent in one loop.  Usage: python nano_agent.py [--verbose] "task" """
+import json
 import os
 import subprocess
 import sys
 
-import anthropic
+import openai
 
-MODEL = os.environ.get("MODEL", "claude-opus-5-5")
+MODEL = os.environ.get("MODEL", "gpt-5.4-mini")
 VERBOSE = "--verbose" in sys.argv
 SYSTEM = "You are a coding agent working in the current directory. Use the tools to do the task."
 
@@ -36,9 +37,10 @@ FUNCTIONS = {"read_file": read_file, "write_file": write_file, "edit_file": edit
 
 
 def schema(name, description, *params):
-    return {"name": name, "description": description,
-            "input_schema": {"type": "object", "required": list(params),
-                             "properties": {p: {"type": "string"} for p in params}}}
+    return {"type": "function", "function": {
+        "name": name, "description": description,
+        "parameters": {"type": "object", "required": list(params),
+                       "properties": {p: {"type": "string"} for p in params}}}}
 
 
 TOOLS = [
@@ -51,8 +53,8 @@ TOOLS = [
 
 def main():
     task = " ".join(arg for arg in sys.argv[1:] if arg != "--verbose")
-    client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY
-    messages = [{"role": "user", "content": task}]
+    client = openai.OpenAI()  # reads OPENAI_API_KEY
+    messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": task}]
 
     # The loop. This is the whole agent.
     for turn in range(1, 21):
@@ -60,27 +62,25 @@ def main():
             print(f"\n--- request {turn}: sending {len(messages)} messages ---")
 
         # 1. Send everything so far: system prompt, tool schemas, full history.
-        response = client.messages.create(
-            model=MODEL, max_tokens=4096, system=SYSTEM, tools=TOOLS, messages=messages)
-        messages.append({"role": "assistant", "content": response.content})
+        response = client.chat.completions.create(model=MODEL, tools=TOOLS, messages=messages)
+        reply = response.choices[0].message
+        messages.append(reply)
 
         # 2. No tool calls means the model is done: print the answer and stop.
-        calls = [block for block in response.content if block.type == "tool_use"]
-        if not calls:
-            print("\n" + "".join(b.text for b in response.content if b.type == "text"))
+        if not reply.tool_calls:
+            print("\n" + reply.content)
             return
 
         # 3. The model only asked. We run each tool and send the results back.
-        results = []
-        for call in calls:
+        for call in reply.tool_calls:
+            name, args = call.function.name, json.loads(call.function.arguments)
             if VERBOSE:
-                print(f"  tool call: {call.name}({str(call.input)[:100]})")
+                print(f"  tool call: {name}({str(args)[:100]})")
             try:
-                output = FUNCTIONS[call.name](**call.input)
+                output = FUNCTIONS[name](**args)
             except Exception as error:
                 output = f"error: {error}"
-            results.append({"type": "tool_result", "tool_use_id": call.id, "content": output})
-        messages.append({"role": "user", "content": results})
+            messages.append({"role": "tool", "tool_call_id": call.id, "content": output})
 
     print("stopped: hit the 20 turn limit")
 

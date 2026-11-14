@@ -1,0 +1,14 @@
+{
+  "enableAllProjectMcpServers": true,
+  "permissions": {
+    "allow": [
+      "mcp__tracker",
+      "Edit",
+      "Bash(python -m pytest:*)",
+      "Bash(python3 -m pytest:*)",
+      "Bash(.venv/bin/python -m pytest:*)",
+      "Bash(.venv/bin/pytest:*)",
+      "Bash(pytest:*)"
+    ]
+  }
+}

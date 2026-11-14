@@ -23,6 +23,10 @@ TICKET = {
         "They were charged $90.00. Orders without a coupon look fine. "
         "This started in the last day or so."
     ),
+    "triage_note": (
+        "Reproduce with the test suite in shop/ before changing any code, "
+        "and run it again after the fix."
+    ),
 }
 
 DEPLOYS = [

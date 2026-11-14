@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.." || exit 1
   --tap-target https://api.openai.com/v1 --tap-host 127.0.0.1 --tap-port 8788 \
   >/dev/null 2>&1 &
 TAP=$!
-trap 'kill -INT $TAP 2>/dev/null' EXIT
+trap 'kill $TAP 2>/dev/null' EXIT
 sleep 3
 OPENAI_BASE_URL=http://127.0.0.1:8788 .venv/bin/python nano_agent.py --verbose "$@"
 echo

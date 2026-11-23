@@ -1,321 +1,207 @@
-# Demo guide: agent loops and tool-call observability
+# X-ray the coding agent you already use
 
-One talk, three acts, about 25 minutes:
+**Audience** — Engineers who already use Claude Code or another coding agent.
 
-1. **The agent you already use**: Claude Code fixes a ticket through an MCP
-   tool, then `/context` shows what it carries before your first word.
-2. **The loop**: `nano_agent.py`, the same loop in 92 lines.
-3. **Observability**: Phoenix draws that loop as a span tree. Then we break
-   a tool on purpose and find the problem from the trace.
+**Takeaway** — An agent run is a loop of model requests and tool executions. A trace lets you see where that loop spent time and tokens, and how it recovered from failed calls.
 
-Takeaway line: *"You use this daily. This course is about knowing why it works and when it won't."*
+| Time | What to cover | On screen |
+|---|---|---|
+| 0:00–2:00 | [Introduce the project](#introduce-the-project) | SHOP-142 or the terminal |
+| 2:00–9:00 | [Observe Claude Code](#observe-claude-code) | Claude Code → `/context` → Phoenix |
+| 9:00–14:00 | [Explain the agent loop](#explain-the-agent-loop) | `nano_agent.py` → loop diagram → terminal |
+| 14:00–23:00 | [Trace and debug the loop](#trace-and-debug-the-loop) | Phoenix → clean run → run with injected timeouts |
+| 23:00–25:00 | [Close](#close) | The two run summaries or the last trace |
 
-`RUNSHEET.md` is the timed cue card. This file has the details: what to run,
-what to show, what to expect.
+Use the blockquotes as speaker notes. The commands and screen directions are your live cues.
 
----
+## Introduce the project
 
-## 0. Prepare (30 min before)
+**Say**
 
-### One-time setup
+> Think about the last time you handed a ticket to a coding agent and got back “fixed, tests pass.” How would you tell what it tried before it got to that answer?
+>
+> I built X-ray to make that work visible. It’s a small demo with a buggy checkout, a local ticket tracker, and a 92-line Python agent that I wrote so we could read the whole loop. I set up both Claude Code and the Python agent to send traces to Phoenix, a trace viewer. We’ll start with Claude Code, walk through the Python loop, then make a tool fail and use the trace to see how the agent responds.
 
-```bash
-cd xray-demo
-uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt
-```
+**Transition**
 
-Create `.env` in the repo from the template (it is git-ignored, never committed):
+> Here’s the ticket. A customer expected to pay $88 after applying a coupon, and checkout charged $90. Let’s give Claude Code the ticket number and see what it does with it.
 
-```
-cp .env.example .env   # then set OPENROUTER_API_KEY=sk-or-v1-...
-```
+## Observe Claude Code
 
-Run `claude` once in this folder to accept the trust dialog and log in.
+### Give it the ticket
 
-### Three terminal tabs
-
-Use Terminal.app or iTerm, **not** a shell inside the Claude desktop app
-(its environment breaks the `claude` login). Font 20pt+.
-
-**Tab 1: Phoenix server** (leave it running)
-
-```bash
-cd xray-demo && scripts/phoenix.sh
-```
-
-Expect `Phoenix is up and running` and the URL http://127.0.0.1:6006.
-The first start downloads Phoenix through `uvx` (about 1 min), so do it early.
-
-**Tab 2: the demo shell** (everything else runs here)
-
-```bash
-cd xray-demo && source .venv/bin/activate
-scripts/reset.sh && scripts/check.sh
-```
-
-Expect every line to be `ok:` and the last line to be **`READY`**.
-
-**Tab 3: spare**, for `cat`, `git diff` and the fallback commands.
-
-### Browser (zoom 150%)
-
-http://127.0.0.1:6006 → project **nano-agent** → **Traces**.
-
-### Editor
-
-Open `nano_agent.py`, `tracing.py`, `mock_mcp/tracker_server.py` and `shop/cart.py`.
-
-### Rehearse once
-
-Do Act 1 once before the talk and write down the total that `/context`
-shows. You'll compare it with the guesses on stage.
-
----
-
-## Act 1: The agent you already use (8 min)
-
-### 1.1 The guess (1 min)
-
-Ask the room: **"How many tokens does Claude Code send before it reads your
-first word?"** Take three guesses and write down the highest.
-
-### 1.2 Run a normal task (2 min)
+Launch Claude Code with the demo’s tracker and telemetry enabled.
 
 ```bash
 scripts/claude_phoenix.sh
 ```
 
-This is plain `claude --strict-mcp-config --mcp-config .mcp.json` with Claude
-Code's built-in OpenTelemetry traces (beta) turned on and sent to Phoenix,
-project **claude-code**, through `scripts/claude_relay.py` (it makes the spans
-readable and strips your email). Don't mention it yet: you reveal the trace in Act 3.
+Paste this prompt.
 
-Type:
-
-```
+```text
 Ticket SHOP-142 says the checkout total is wrong. Read the ticket, find the cause,
 fix it, make sure the tests pass, and leave a comment on the ticket.
 ```
 
-**Expect** (about 30 s): `get_ticket` on the tracker MCP → read `cart.py` and
-the tests → pytest (1 failed) → edit → pytest (5 passed) → `add_comment`.
-Approve a prompt if one appears.
+**While it runs**
 
-Say: *"Looks like a normal day at work."* Then in tab 3:
+> The prompt gives Claude Code a goal and a ticket ID. The ticket lives in our local mock tracker, which we connected through MCP, the Model Context Protocol. Watch for two tracker calls, one to look up the ticket and one to leave a comment. In between, Claude Code can read and edit files and run the tests.
+
+**Show** the ticket lookup, a test run, the edit, and the final comment as they appear. Respond to the demo’s permission prompts if they appear. Expect one coupon test to fail before the fix and five tests to pass afterward. The exact call order can vary. From a separate terminal, show the saved comment to verify the write.
 
 ```bash
 cat mock_mcp/comments.json
 ```
 
-**Expect:** the comment Claude Code left on SHOP-142.
+### Show the context
 
-### 1.3 What it carries: `/context` (2 min)
+Type `/context` in Claude Code. Point at the system prompt, built-in tools, MCP tools, and conversation categories in the current session.
 
-In Claude Code, type `/context`.
+**Say**
 
-**Expect:** a breakdown of the context window by category: system prompt,
-system tools, **MCP tools**, messages, free space. Point at the totals:
-most of it is system prompt and tool schemas, and only a small slice is
-your messages. Compare with the guesses.
+> My task was two sentences. Look at what else is in the session. There are instructions for the agent, descriptions of the tools it can use, and messages from the work it just did. This view tells us what’s taking up context. To see which calls actually ran and how long they took, let’s open the trace.
 
-**Point:** most of each request is not your prompt, and all of it is sent
-again on every turn.
+Exit Claude Code with `/exit` and give the exporter a few seconds to flush.
 
-### 1.4 An MCP tool is just a schema (2 min)
+### Open the Claude Code trace
 
-Point at the MCP tools line in `/context`, then show
-`mock_mcp/tracker_server.py`: three functions. The docstring becomes the
-tool description and the type hints become the JSON schema.
+In [Phoenix](http://127.0.0.1:6006), go to **Projects** → **claude-code** → **Traces**. Open the newest `claude code turn` for SHOP-142. A **span** is a timed record of a single operation. The trace groups the spans for the turn.
 
-**Point:** an MCP tool is just another JSON schema in the list sent to the model.
+| Show | Say |
+|---|---|
+| The root `claude code turn` and the tree below it | “Here’s the prompt I just entered. Under it are the model requests and tool executions that made up this turn.” |
+| `mcp__tracker__get_ticket` and `mcp__tracker__add_comment` | “These spans show the two tracker calls and their timing. The MCP payload fields are blank in this setup. We can verify the comment in the tracker file.” |
+| A `Bash` span that ran pytest | “For this call, we can see the command, its result, and how long it took. That’s the tool running on this machine.” |
+| The first and last task-model spans, if time allows | “The prompt token count tells us how much context each request carried. In the saved rehearsal, the main model went from roughly 27,500 to 33,200 input tokens. Those totals include cached input.” |
 
-Exit with `/exit`.
+**Transition**
 
----
+> Look at the pattern in the tree. There’s a model request, then some tool calls, and then another model request. What’s sending those tool results back to the model? That’s the part I wanted to make easy to read, so I wrote a tiny harness that does it in Python.
 
-## Act 2: The whole loop in 92 lines (5 min)
+## Explain the agent loop
 
-```bash
-scripts/reset.sh
-wc -l nano_agent.py
-```
+Open [`nano_agent.py`](nano_agent.py) at `# The loop. This is the whole agent.` Put the three numbered comments on screen. Use the same example through all three steps.
 
-In the editor, scroll to `# The loop. This is the whole agent.` and walk the
-three numbered comments:
+**Say**
 
-1. send everything (system prompt, tools, history)
-2. no tool calls → print the answer and stop
-3. run each tool and append the result
+> The harness is the code that runs the agent. It makes the model request, executes tools on the machine, and keeps the conversation history.
+>
+> First, it sends the system prompt, the task, and the tool schemas. A schema tells the model which tool it can ask for and what arguments to provide. On later requests this little agent also sends the history it has accumulated.
+>
+> Second, it reads the model’s reply. If there are no tool calls in the reply, the harness prints the answer and ends the run. A separate 20-turn limit keeps the demo bounded.
+>
+> Third, if the model asks for Bash with `python -m pytest shop -q`, the Python harness runs that command and appends the result to the conversation. On the next model request, the model can see which test failed and ask to read or edit the relevant file. That’s the pattern we just saw in Claude Code. This Python version has four tools.
 
-Then open `docs/agent_loop.html` in the browser and click through its 8 steps
-(arrow keys work). It shows the same loop: harness, model and tools, the
-context strip growing every turn, and which span each step emits in Phoenix.
+If you have a minute, open the existing [interactive diagram](docs/agent_loop.html). Use the right arrow to advance to **The model replies with a tool call** → **The harness runs the tool** → **The result is appended to the context**. Point to the new result in the context strip.
 
 ```bash
 open docs/agent_loop.html
 ```
 
-Run it, traced (this run becomes the trace for Act 3):
+**Run the small agent** on the same checkout bug. Reset first so the coupon test fails again.
 
 ```bash
-SESSION_ID=live-clean scripts/nano_phoenix.sh "The tests in shop/ are failing. Find the bug and fix it."
+scripts/reset.sh
+FAULT= SESSION_ID=live-clean scripts/nano_phoenix.sh "The tests in shop/ are failing. Find the bug and fix it."
 python -m pytest shop -q
 ```
 
-**Expect:** about 5 requests in 13-30 s. `sending N messages` grows each
-request (2 → 5 → 9 → 11 → 13). Tool calls appear as they happen: bash,
-read_file, edit_file. Then a "Fixed `Cart.total()`..." message, then
-`trace: http://127.0.0.1:6006`, then pytest prints `5 passed`.
+**While it runs**
 
-**Point:** this is the same loop Claude Code runs, with 4 tools and a
-one-line system prompt. The model never runs anything: it asks, and the
-loop runs it.
+> Watch the line that says “sending N messages.” Every time the harness adds a tool request and its result, the next model call has more history. In a moment we can open one of those requests and see what was actually added.
 
----
+When the independent pytest run shows `5 passed`, point to it and switch to Phoenix.
 
-## Act 3: Observability with Phoenix (10 min)
+**Transition**
 
-Bridge: *"The terminal shows what happened. It doesn't show what each step
-cost, how long the tools took, or what exactly the model saw. Traces do."*
+> We’ve seen the loop in code and watched it do the job. Now let’s use the trace to answer the question we started with. How did the agent get there?
 
-### 3.1 X-ray the clean run (4 min)
+## Trace and debug the loop
 
-In Phoenix: refresh **Traces** → click the newest **agent run**.
+### Read the clean run
 
-| Click | Show | Say |
-|---|---|---|
-| Left tree | ChatCompletion → bash → read_file → ... | "The loop, drawn as a tree. LLM and tools take turns." |
-| First ChatCompletion → Info | System prompt, the 4 tool schemas, the user message | "This is exactly what the model receives." |
-| Last ChatCompletion | The full message history, every tool call and result | "Every turn resends everything." |
-| Token counts, first to last ChatCompletion | about 231 → about 2.2k prompt tokens | "Context growth is where cost and limits come from." |
-| A `bash` span running pytest | Input = command, Output = test result, ~1 s | "The harness runs the tool. The model only asked." |
-| Top bar | Total Cost ~$0.01, Latency | "Every run has a price and a duration." |
-| Root span | Input = task, Output = final answer | "One row per run, which you can search." |
+In Phoenix, go to **Projects** → **nano-agent** → **Traces**. Open the newest `agent run` for session `live-clean` and keep it open in one tab.
 
-### 3.2 Break it (4 min)
+| Show | Say |
+|---|---|
+| The `agent run` root and its child spans | “The root ties the task to the final answer. Each `ChatCompletion` span is one model request. The spans named after tools are the harness executing those calls.” |
+| The first and last `ChatCompletion` inputs | “The first request has the system message, the task and four tool schemas. In the last one you can see the tool calls and results that became part of the conversation.” |
+| One `bash` span for pytest | “Here’s what the harness ran and what came back. We can check the tool result directly and see how much time the call took.” |
+
+Point to the run’s token total and duration. If Phoenix shows a cost estimate, point to that too. Use the live numbers on screen.
+
+### Run the same task with timeouts
+
+**Say before running**
+
+> Now I’ll reset the checkout again and give the agent the exact same prompt. This time the first two tool calls that try to run pytest will get an injected timeout response. Let’s see what happens to the run when the agent has to deal with that.
 
 ```bash
 scripts/reset.sh
 FAULT=timeout SESSION_ID=live-broken scripts/nano_phoenix.sh "The tests in shop/ are failing. Find the bug and fix it."
+python -m pytest shop -q
 ```
 
-**Expect:** `[fault injected: timeout]`. The first two pytest runs return a fake
-timeout. The agent detours (checks python, the venv, plugins) and still fixes
-the bug in about 13 requests and about 30 s. The final message looks the same as the clean run.
+**Stage cue** — Expect `[fault injected: timeout]`. The first two matching calls get a simulated error immediately. The message says “timed out after 60s” to imitate the tool failure. If the run takes too long or fails to fix the bug, switch to the saved comparison.
 
-Ask the room: **"Did anything go wrong?"** Then open the trace:
+Once the tests pass, ask the room and pause for a beat.
 
-- **Red ✕** on `bash` spans → click one → `error: command timed out after 60s`.
-- The detour: the extra ChatCompletion/bash pairs after it.
-- Compare with the clean run (rehearsal numbers):
+> The agent says it fixed the bug, and the tests pass. Where would you look to see what those timeouts did to the run?
 
-| | Clean | Broken |
-|---|---|---|
-| LLM calls | 5 | 13 |
-| Tokens | 7.9k | 28.7k |
-| Cost | 1× | ~3.6× |
-| Failed tool spans | 0 | 4 |
-| Final answer | fixed | fixed |
+Open the newest `live-broken` trace in a second tab. Click a red `bash` span with the timeout in its output, then point to the model and tool calls that follow it. Compare total tokens and wall-clock duration with the clean run.
 
-**Point:** the output was the same. Only the trace shows it cost 3.6× and
-took a detour. For agents, "it worked" tells you little.
+**Say while pointing to the spans**
 
-### 3.2b Reveal: Claude Code was traced too (2 min)
+> Here’s the timeout the harness returned. The next model request includes that result. Follow the calls after it and you can see what the agent tried to get the tests running again.
 
-Say: *"Remember the Claude Code run from Act 1? It was traced as well."*
-Phoenix → **Projects** → **claude-code** → **Traces** → the newest trace.
+If the live comparison is unclear, open these saved rehearsal sessions. Both traces show a passing test run after the edit.
 
-**Expect** (from the rehearsal run): about 21 spans, 39.7 s, Total Cost about $0.38.
+| Rehearsal run | Model requests | Total tokens | Duration | Tool spans marked as errors |
+|---|---:|---:|---:|---:|
+| `clean-1` | 5 | 7,860 | 12.9 s | 0 |
+| `timeout-1` | 13 | 28,667 | 21.6 s | 4 |
 
-| Click | Show | Say |
-|---|---|---|
-| Root `claude code turn` | Input = the prompt you typed | "Same root as nano-agent's agent run." |
-| Left tree | `claude-opus-5` calls taking turns with ToolSearch, `mcp__tracker__get_ticket`, Bash, Read, Edit, `mcp__tracker__add_comment` | "Same loop, same shape." |
-| First `claude-opus-5` | about 27.5k tokens | Answer the Act 1 guess: nano-agent's first call was about 231 |
-| Last `claude-opus-5` | about 32.6k tokens | Context grows the same way |
-| A `Bash` span (pytest) | Input = command, Output = test result | "The harness ran it, exactly as in our loop." |
-| The small `claude-haiku` call at the top | a side request (housekeeping) | "Not every model call is your task." |
+**Say over the saved comparison**
 
-MCP tool spans show no input/output: Claude Code doesn't emit content for MCP
-tools. That's a real limitation of today's telemetry, worth saying out loud.
+> Both rehearsal runs ended with a fix. With the injected timeouts, model requests went from 5 to 13 and total tokens went from about 8,000 to about 29,000. Here’s the timeout and here are the extra calls that followed it. When an agent gets slower or more expensive, this gives me a place to start looking.
 
-**Point:** the agent you use every day already emits OpenTelemetry. No code
-changes: environment variables plus a 186-line relay that maps its span names
-onto what Phoenix understands (`scripts/claude_relay.py`). That mapping step is
-normal in real observability setups.
+### If there’s time or someone asks
 
-### 3.3 What a trace can't see (1 min, talk only)
+- **How is it wired?** Show [`tracing.py`](tracing.py). “The OpenAI SDK instrumentation records model requests. We wrap each Python tool call to record its inputs, outputs and errors. For Claude Code, the launcher enables its OpenTelemetry export and a local relay maps the spans into fields Phoenix displays.”
+- **What if the tool returns the wrong thing?** Open saved session `stale-1`. “Here pytest kept returning an old failure. Phoenix recorded zero tool errors, and the agent went through about 48,000 tokens. A trace lets us inspect those results. An independent test or an assertion about the tool output helps us check correctness.”
 
-Open session **stale-1** (a rehearsal trace already in Phoenix). There, pytest
-kept returning the *old* failure, like a stuck cache. Result: **zero red spans**,
-48k tokens, and the agent eventually ran `cat faults.py` and found the fault
-injection itself.
+## Close
 
-**Point:** a tool that lies is not an error. Spans show symptoms. Catching
-lies needs evals and assertions on tool outputs.
+Leave the clean and timeout run summaries visible. If you have only 30 seconds, read this as written.
 
-Do **not** run `FAULT=stale` live: it takes about 90 s and its path is unpredictable.
+> You already know what it feels like to give a task to a coding agent. Now you’ve seen what happens between the prompt and the answer. The model asks for tools, the harness runs them, and the results go back into the next request. When a run surprises you, open the trace and follow that sequence to the first call that behaved differently from what you expected. And when the agent says “fixed,” check the result as well as the path it took to get there.
 
-### 3.4 How it's wired and the production slide (1 min)
+## Before going live
 
-Show `tracing.py`: `register(...)` plus `OpenAIInstrumentor` gives LLM spans for
-free, and wrapping each tool function adds TOOL spans. `nano_agent.py` only got a
-3-line hook. Everything is OpenTelemetry, so the same spans can go to Phoenix,
-Langfuse, or any OTel backend.
-
-In production, add:
-
-- **Sampling**: you won't keep every trace.
-- **PII redaction**: prompts and tool outputs contain user data.
-- **Evals over traces**: grade outputs, not just status codes.
-- **Sessions and cost dashboards**: per user, per feature.
-- **Tools:** Phoenix (local, open source, as shown), Langfuse (self-host or
-  cloud, prompt versions), and Claude Code's own OpenTelemetry export
-  (`CLAUDE_CODE_ENABLE_TELEMETRY=1`).
-
----
-
-## Close (1 min)
-
-*"You use this daily. This course is about knowing why it works and when it
-won't."* Tease: later sessions put several of these loops on one incident and
-trace them together.
-
----
-
-## Between rehearsals
+Run the commands from the `xray-demo` repo. If the environment is already set up, start with the terminal tabs.
 
 ```bash
-scripts/reset.sh     # bug back, ticket comments cleared (< 1 s)
-scripts/check.sh     # must print READY
+uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt
+test -e .env || cp .env.example .env
 ```
 
-## If something goes wrong
+Set `OPENROUTER_API_KEY` in the local `.env` if needed. Use a regular terminal and open `claude` once beforehand to handle login and the workspace trust prompt. The traced launcher expects Claude Code 2.1.139 or later.
 
-| Problem | Do this |
+| Where | Prepare |
 |---|---|
-| `claude` asks to log in | `/login`; if it fails, skip to Act 2 and describe Act 1 |
-| Tracker tools missing in Claude Code | `scripts/check.sh`, then restart `scripts/claude_phoenix.sh` |
-| No **claude-code** project in Phoenix | wait ~5 s (spans export in batches), refresh; Claude Code must be 2.1.139+ |
-| Claude Code task runs past 90 s | Esc, `scripts/reset.sh`, move on to `/context` anyway |
-| `Phoenix not running` | start `scripts/phoenix.sh` in tab 1 |
-| New trace missing in Phoenix | refresh; time range (top right) = Last 7 Days |
-| OpenRouter 401/402 | key expired or out of credit: show the rehearsal traces (clean-*, timeout-*, stale-1) |
-| No network at all | walk `nano_agent.py`, then show the rehearsal traces in `.phoenix/` |
-| Agent wanders on stage | Ctrl-C, `scripts/reset.sh`, show the rehearsal trace with the same name |
+| Terminal 1 | Run `scripts/phoenix.sh` and leave it running. Start early if Phoenix needs to download. |
+| Terminal 2 | Run `source .venv/bin/activate`, then `scripts/reset.sh && scripts/check.sh`. Expect one planted test failure, four passes, three tracker tools, and `READY`. Check for any `WARN` lines. |
+| Terminal 3 | Keep it at the repo root for checking the tracker comment and running commands separately. |
+| Browser | Open [Phoenix](http://127.0.0.1:6006). Keep the saved Claude Code trace (`872b223c`, 19:02 IST) and the `clean-1` and `timeout-1` sessions handy. |
+| Editor | Open `nano_agent.py` at the loop and keep `tracing.py` nearby for questions. |
 
-## File map
+`scripts/reset.sh` restores the tracked files under `shop/` and clears the demo’s ticket comments. Run it after rehearsing so the presentation starts with the bug in place.
 
-| File | Role |
+**If you have 15 minutes** — Use 1 minute for the intro, 4 for Claude Code and its trace, 3 for the Python loop, 6 for the clean and timeout traces, and 1 to close. Show one context category, one Claude tool span, and one timeout span. Use the saved nano-agent traces to keep the timing predictable.
+
+| If this happens | Do this |
 |---|---|
-| `shop/` | target app, one planted bug (coupon applied after tax) |
-| `mock_mcp/tracker_server.py` | mock ticket tracker (MCP, stdio) |
-| `.mcp.json` | registers the tracker for Claude Code |
-| `nano_agent.py` | the agent loop |
-| `tracing.py` | Phoenix/OpenTelemetry spans for the loop |
-| `faults.py` | `FAULT=timeout` / `FAULT=stale` tool failures |
-| `scripts/phoenix.sh` | Phoenix server (uvx, data in `.phoenix/`) |
-| `scripts/nano_phoenix.sh` | traced agent run on OpenRouter |
-| `scripts/claude_phoenix.sh` | Claude Code with its OpenTelemetry traces sent to Phoenix |
-| `scripts/claude_relay.py` | rewrites Claude Code spans for Phoenix (names, input/output, tokens, no email) |
-| `scripts/reset.sh`, `scripts/check.sh` | reset and preflight |
+| Claude Code asks to log in or the live task runs past 90 seconds | Use the saved Claude Code trace and narrate the ticket. In the live terminal use Esc to interrupt a long-running task. |
+| Claude Code trace is missing | Wait a few seconds after `/exit`, refresh the project, and check the time range. Use the saved trace if the new one stays missing. |
+| Nano-agent hits an API error or takes too long | Stop the run if needed and open `clean-1` and `timeout-1`. Use the exact numbers in the rehearsal table. |
+| Network or Phoenix is unavailable | Show the Python loop and the local diagram. Walk through the saved comparison using the numbers above. Local Phoenix can serve saved traces from `.phoenix/` when it is running. |

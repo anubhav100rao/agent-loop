@@ -82,8 +82,12 @@ first word?"** Take three guesses and write down the highest.
 ### 1.2 Run a normal task (2 min)
 
 ```bash
-claude --strict-mcp-config --mcp-config .mcp.json
+scripts/claude_phoenix.sh
 ```
+
+This is plain `claude --strict-mcp-config --mcp-config .mcp.json` with Claude
+Code's built-in OpenTelemetry traces (beta) turned on and sent to Phoenix,
+project **claude-code**. Don't mention it yet: you reveal the trace in Act 3.
 
 Type:
 
@@ -207,6 +211,24 @@ Ask the room: **"Did anything go wrong?"** Then open the trace:
 **Point:** the output was the same. Only the trace shows it cost 3.6× and
 took a detour. For agents, "it worked" tells you little.
 
+### 3.2b Reveal: Claude Code was traced too (2 min)
+
+Say: *"Remember the Claude Code run from Act 1? It was traced as well."*
+Phoenix → **Projects** → **claude-code** → **Traces** → the newest trace.
+
+- Root span `claude_code.interaction`: the prompt you typed.
+- Children: `claude_code.llm_request` spans (model, tokens, cost) taking turns with
+  `claude_code.tool` spans: `mcp__tracker__get_ticket`, Read, Bash (pytest),
+  Edit, Bash, `mcp__tracker__add_comment`.
+- Same shape as nano-agent's tree. Put the token counts side by side: Claude
+  Code's first LLM request is tens of thousands of tokens; nano-agent's is about 231.
+
+**Point:** the agent you use every day already emits OpenTelemetry. No code
+changes, just environment variables (see `scripts/claude_phoenix.sh`).
+
+> **Privacy:** Claude Code spans carry your account email and IDs in their
+> **Attributes** tab. Stay on the tree view and the **Info** tab.
+
 ### 3.3 What a trace can't see (1 min, talk only)
 
 Open session **stale-1** (a rehearsal trace already in Phoenix). There, pytest
@@ -258,7 +280,8 @@ scripts/check.sh     # must print READY
 | Problem | Do this |
 |---|---|
 | `claude` asks to log in | `/login`; if it fails, skip to Act 2 and describe Act 1 |
-| Tracker tools missing in Claude Code | `scripts/check.sh`, then restart `claude` with the same flags |
+| Tracker tools missing in Claude Code | `scripts/check.sh`, then restart `scripts/claude_phoenix.sh` |
+| No **claude-code** project in Phoenix | wait ~5 s (spans export in batches), refresh; Claude Code must be 2.1.139+ |
 | Claude Code task runs past 90 s | Esc, `scripts/reset.sh`, move on to `/context` anyway |
 | `Phoenix not running` | start `scripts/phoenix.sh` in tab 1 |
 | New trace missing in Phoenix | refresh; time range (top right) = Last 7 Days |
@@ -278,4 +301,5 @@ scripts/check.sh     # must print READY
 | `faults.py` | `FAULT=timeout` / `FAULT=stale` tool failures |
 | `scripts/phoenix.sh` | Phoenix server (uvx, data in `.phoenix/`) |
 | `scripts/nano_phoenix.sh` | traced agent run on OpenRouter |
+| `scripts/claude_phoenix.sh` | Claude Code with its OpenTelemetry traces sent to Phoenix |
 | `scripts/reset.sh`, `scripts/check.sh` | reset and preflight |

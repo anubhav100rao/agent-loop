@@ -2,7 +2,7 @@
 
     agent run (AGENT)
     ├── ChatCompletion (LLM)   <- automatic, from the OpenAI SDK instrumentation
-    ├── bash (TOOL)            <- added here: what a request proxy never sees
+    ├── bash (TOOL)            <- added here: the harness running the tool
     ├── ChatCompletion (LLM)
     └── ...
 

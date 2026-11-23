@@ -6,7 +6,6 @@ fail() { echo "FAIL: $1"; exit 1; }
 
 [ -x "$PY" ] || fail "no .venv (see README setup)"
 $PY -c "import mcp, openai, pytest" 2>/dev/null || fail "python deps missing"
-[ -x .venv/bin/claude-tap ] || fail "claude-tap not installed"
 command -v claude >/dev/null || fail "claude CLI not on PATH"
 echo "ok: deps installed"
 
@@ -29,6 +28,5 @@ echo "ok: Phoenix deps installed"
 if curl -s -o /dev/null http://127.0.0.1:6006; then echo "ok: Phoenix running at http://127.0.0.1:6006"
 else echo "WARN: Phoenix not running (start scripts/phoenix.sh in another tab)"; fi
 
-[ -n "$OPENAI_API_KEY" ] || echo "WARN: OPENAI_API_KEY not set (plain nano_agent.py needs it)"
 [ -n "$OPENROUTER_API_KEY" ] || echo "WARN: OPENROUTER_API_KEY not set (scripts/nano_phoenix.sh needs it)"
 echo "READY"

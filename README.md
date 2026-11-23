@@ -1,14 +1,15 @@
-# xray-demo
+# agent-loop
 
-X-ray the agent you already use: trace what Claude Code sends to the
-model, then run the same loop in 89 lines (`nano_agent.py`).
+What happens inside the coding agent you already use: watch Claude Code fix
+a ticket, run the same loop in 92 lines (`nano_agent.py`), then trace that
+loop with Phoenix and break it on purpose.
 
 ## Setup
 
 ```bash
 uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt
 source .venv/bin/activate
-set -a; . ../.env; set +a; export OPENAI_API_KEY=$OPEN_AI_API_KEY   # only nano_agent.py needs this
+set -a; . ../.env; set +a      # OPENROUTER_API_KEY (and optionally OPEN_AI_API_KEY)
 claude                         # once: accept the trust dialog, /login if asked
 # use a normal terminal, not a shell inside the Claude desktop app
 scripts/check.sh               # must end with READY
@@ -27,4 +28,5 @@ Runs on OpenRouter (`OPENROUTER_API_KEY`, model `openai/gpt-6.2-sol`).
 
 ## Run
 
-See `RUNSHEET.md`. Between runs: `scripts/reset.sh`.
+`demo.md` is the full presentation guide; `RUNSHEET.md` is the timed cue
+card. Between runs: `scripts/reset.sh`.

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The agent loop</title>
+<style>
+:root{--bg:#fafaf8;--text:#1f1e1b;--muted:#5f5e5a;--line:#888780;--btn:#fff;--btn-b:#d3d1c7;
+--gray-f:#F1EFE8;--gray-s:#5F5E5A;--gray-t:#444441;--gray-u:#5F5E5A;
+--teal-f:#E1F5EE;--teal-s:#0F6E56;--teal-t:#085041;--teal-u:#0F6E56;
+--purple-f:#EEEDFE;--purple-s:#534AB7;--purple-t:#3C3489;--purple-u:#534AB7;
+--coral-f:#FAECE7;--coral-s:#993C1D;--coral-t:#712B13;--coral-u:#993C1D}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1a18;--text:#ecebe6;--muted:#b4b2a9;--line:#888780;--btn:#2c2c2a;--btn-b:#5f5e5a;
+--gray-f:#444441;--gray-s:#B4B2A9;--gray-t:#F1EFE8;--gray-u:#D3D1C7;
+--teal-f:#085041;--teal-s:#5DCAA5;--teal-t:#E1F5EE;--teal-u:#9FE1CB;
+--purple-f:#3C3489;--purple-s:#AFA9EC;--purple-t:#EEEDFE;--purple-u:#CECBF6;
+--coral-f:#712B13;--coral-s:#F0997B;--coral-t:#FAECE7;--coral-u:#F5C4B3}}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:860px;margin:0 auto;padding:32px 16px}
+h1{font-size:24px;font-weight:500;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 20px;font-size:15px}
+svg text{font-family:inherit}
+.t{font-size:14px;fill:var(--text)}.ts{font-size:12px;fill:var(--muted)}.th{font-size:14px;font-weight:500;fill:var(--text)}
+.c-gray>rect{fill:var(--gray-f);stroke:var(--gray-s)}.c-gray>.th{fill:var(--gray-t)}.c-gray>.ts{fill:var(--gray-u)}
+.c-teal>rect{fill:var(--teal-f);stroke:var(--teal-s)}.c-teal>.th{fill:var(--teal-t)}.c-teal>.ts{fill:var(--teal-u)}
+.c-purple>rect{fill:var(--purple-f);stroke:var(--purple-s)}.c-purple>.th{fill:var(--purple-t)}.c-purple>.ts{fill:var(--purple-u)}
+.c-coral>rect{fill:var(--coral-f);stroke:var(--coral-s)}.c-coral>.th{fill:var(--coral-t)}.c-coral>.ts{fill:var(--coral-u)}
+.controls{display:flex;align-items:center;gap:10px;margin:12px 0 8px}
+button{font:inherit;font-size:14px;padding:7px 16px;border-radius:8px;border:1px solid var(--btn-b);background:var(--btn);color:var(--text);cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+#dots{color:var(--muted);letter-spacing:3px;font-size:13px}
+#cap-title{font-size:18px;font-weight:500}
+#cap-body{color:var(--muted);font-size:16px;line-height:1.6;margin-top:4px}
+.hint{color:var(--muted);font-size:13px;margin-top:20px}
+</style>
+</head>
+<body>
+<main>
+<h1>The agent loop</h1>
+<p class="sub">Fixing ticket SHOP-142, one step at a time. Use the buttons or the arrow keys.</p>
+<svg width="100%" viewBox="0 0 680 370" role="img">
+<title>Agent loop</title>
+<desc>Harness, model and tools with arrows for request, reply, run tool and result, plus a context strip that grows every turn.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<g class="c-teal" id="b-harness">
+<rect x="40" y="30" width="240" height="150" rx="12" stroke-width="0.5"/>
+<text class="th" x="160" y="94" text-anchor="middle" dominant-baseline="central">Harness</text>
+<text class="ts" x="160" y="116" text-anchor="middle" dominant-baseline="central">Your code: the while loop</text>
+</g>
+<g class="c-purple" id="b-model">
+<rect x="400" y="30" width="240" height="150" rx="12" stroke-width="0.5"/>
+<text class="th" x="520" y="94" text-anchor="middle" dominant-baseline="central">Model</text>
+<text class="ts" x="520" y="116" text-anchor="middle" dominant-baseline="central">Reads context, decides</text>
+</g>
+<g class="c-coral" id="b-tools">
+<rect x="40" y="220" width="240" height="56" rx="8" stroke-width="0.5"/>
+<text class="th" x="160" y="240" text-anchor="middle" dominant-baseline="central">Tools</text>
+<text class="ts" x="160" y="258" text-anchor="middle" dominant-baseline="central">bash, read, edit, MCP</text>
+</g>
+<text class="ts" x="340" y="60" text-anchor="middle">request</text>
+<path id="a-req" d="M282 72 L398 72" fill="none" stroke="var(--line)" stroke-width="1.5" opacity="0.35" marker-end="url(#arrow)"/>
+<text class="ts" x="340" y="168" text-anchor="middle">reply</text>
+<path id="a-resp" d="M398 140 L282 140" fill="none" stroke="var(--line)" stroke-width="1.5" opacity="0.35" marker-end="url(#arrow)"/>
+<path id="a-run" d="M120 182 L120 218" fill="none" stroke="var(--line)" stroke-width="1.5" opacity="0.35" marker-end="url(#arrow)"/>
+<text class="ts" x="112" y="204" text-anchor="end">run</text>
+<path id="a-res" d="M200 218 L200 182" fill="none" stroke="var(--line)" stroke-width="1.5" opacity="0.35" marker-end="url(#arrow)"/>
+<text class="ts" x="208" y="204">result</text>
+<text class="ts" x="400" y="232">Span emitted</text>
+<g id="span-badge"></g>
+<text class="ts" x="40" y="310">Context sent on every request</text>
+<text class="ts" id="ctx-count" x="640" y="310" text-anchor="end"></text>
+<g id="ctx"></g>
+</svg>
+<div class="controls">
+<button id="prev" onclick="go(-1)">Back</button>
+<button id="next" onclick="go(1)">Next</button>
+<span id="dots"></span>
+</div>
+<div id="cap-title"></div>
+<div id="cap-body"></div>
+<p class="hint">Green: the harness (nano_agent.py or Claude Code). Purple: the model and its messages. Coral: tools and their results.</p>
+</main>
+<script>
+const K={sys:['c-gray','system'],tools:['c-gray','tools'],task:['c-purple','task'],call:['c-purple','call'],res:['c-coral','result'],text:['c-purple','answer']};
+const base=['sys','tools','task'];
+const S=[
+{a:[],ctx:base,span:null,t:'Start: the harness builds a request',b:'System prompt, tool schemas and your task. Nothing has been sent yet.'},
+{a:['a-req'],ctx:base,span:['c-purple','LLM span starts'],t:'Request 1: send everything',b:'The whole context goes to the model. In Claude Code this first request is about 27k tokens; in nano_agent about 231.'},
+{a:['a-resp'],ctx:[...base,'call'],hl:'b-model',span:['c-purple','LLM span ends'],t:'The model replies with a tool call',b:'bash("pytest"). The model only asks. It cannot run anything itself.'},
+{a:['a-run'],ctx:[...base,'call'],hl:'b-tools',span:['c-coral','TOOL span'],t:'The harness runs the tool',b:'pytest runs on your machine: 1 failed. This time is invisible to the model, but a trace records it.'},
+{a:['a-res'],ctx:[...base,'call','res'],hl:'b-harness',span:null,t:'The result is appended to the context',b:'The tool output becomes a new message. The context grew from 3 parts to 5.'},
+{a:['a-req'],ctx:[...base,'call','res'],span:['c-purple','LLM span starts'],t:'Request 2: send everything again',b:'Not just the new part: the full history, every turn. This is where cost and context limits come from.'},
+{a:['a-resp','a-run','a-res'],ctx:[...base,'call','res','call','res','call','res','call','res'],span:['c-coral','LLM, TOOL, LLM, TOOL...'],t:'The same cycle repeats',b:'read_file, edit_file, pytest again (5 passed). Each tool call adds two parts to the context.'},
+{a:['a-resp'],ctx:[...base,'call','res','call','res','call','res','call','res','text'],hl:'b-model',span:['c-purple','Last LLM span'],t:'No tool call: the loop stops',b:'The model answers in plain text. That is the only exit condition, plus a turn limit as a safety net.'}
+];
+let i=0;const NS='http://www.w3.org/2000/svg';
+function el(n,a,p){const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);p&&p.appendChild(e);return e;}
+function draw(){
+const s=S[i];
+['a-req','a-resp','a-run','a-res'].forEach(id=>{const p=document.getElementById(id);const on=s.a.includes(id);p.setAttribute('stroke',on?'#EF9F27':'var(--line)');p.setAttribute('opacity',on?'1':'0.35');p.setAttribute('stroke-width',on?'2.5':'1.5');});
+['b-harness','b-model','b-tools'].forEach(id=>{document.querySelector('#'+id+' rect').setAttribute('stroke-width',s.hl===id?'2':'0.5');});
+const g=document.getElementById('ctx');g.innerHTML='';const w=50,gap=4;
+s.ctx.forEach((k,j)=>{const x=40+j*(w+gap);const gg=el('g',{class:K[k][0]},g);el('rect',{x,y:322,width:w,height:30,rx:4,'stroke-width':0.5},gg);const t=el('text',{class:'ts',x:x+w/2,y:337,'text-anchor':'middle','dominant-baseline':'central'},gg);t.textContent=K[k][1];});
+document.getElementById('ctx-count').textContent=s.ctx.length+' parts';
+const sb=document.getElementById('span-badge');sb.innerHTML='';
+if(s.span){const gg=el('g',{class:s.span[0]},sb);el('rect',{x:400,y:244,width:240,height:32,rx:6,'stroke-width':0.5},gg);const t=el('text',{class:'th',x:520,y:260,'text-anchor':'middle','dominant-baseline':'central'},gg);t.textContent=s.span[1];}
+else{const t=el('text',{class:'ts',x:400,y:262},sb);t.textContent='none';}
+document.getElementById('cap-title').textContent=(i+1)+'. '+s.t;
+document.getElementById('cap-body').textContent=s.b;
+document.getElementById('dots').textContent=S.map((_,j)=>j===i?'●':'○').join('');
+document.getElementById('prev').disabled=i===0;
+document.getElementById('next').textContent=i===S.length-1?'Restart':'Next';
+}
+function go(d){i=(i+d+S.length)%S.length;draw();}
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' ')go(1);if(e.key==='ArrowLeft'&&i>0)go(-1);});
+draw();
+</script>
+</body>
+</html>

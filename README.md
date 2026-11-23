@@ -31,3 +31,6 @@ Runs on OpenRouter; the scripts read `OPENROUTER_API_KEY` and `MODEL` from `.env
 
 `demo.md` is the full presentation guide; `RUNSHEET.md` is the timed cue
 card. Between runs: `scripts/reset.sh`.
+
+`docs/agent_loop.html` is an interactive diagram of the loop: open it in a
+browser and step through it with the arrow keys.

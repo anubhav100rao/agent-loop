@@ -147,6 +147,14 @@ three numbered comments:
 2. no tool calls → print the answer and stop
 3. run each tool and append the result
 
+Then open `docs/agent_loop.html` in the browser and click through its 8 steps
+(arrow keys work). It shows the same loop: harness, model and tools, the
+context strip growing every turn, and which span each step emits in Phoenix.
+
+```bash
+open docs/agent_loop.html
+```
+
 Run it, traced (this run becomes the trace for Act 3):
 
 ```bash

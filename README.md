@@ -14,6 +14,17 @@ claude                         # once: accept the trust dialog, /login if asked
 scripts/check.sh               # must end with READY
 ```
 
+## Phoenix tracing (span view of the loop)
+
+```bash
+scripts/phoenix.sh                     # tab 1: UI at http://127.0.0.1:6006, data in .phoenix/
+scripts/nano_phoenix.sh "The tests in shop/ are failing. Find the bug and fix it."
+FAULT=timeout scripts/nano_phoenix.sh "..."   # first 2 pytest runs fail, agent recovers
+```
+
+Runs on OpenRouter (`OPENROUTER_API_KEY`, model `openai/gpt-6.2-sol`).
+`tracing.py` adds the spans; `nano_agent.py` only gets a 3-line hook.
+
 ## Run
 
 See `RUNSHEET.md`. Between runs: `scripts/reset.sh`.

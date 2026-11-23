@@ -2,3 +2,5 @@ mcp<2
 openai
 pytest
 claude-tap
+arize-phoenix-otel
+openinference-instrumentation-openai

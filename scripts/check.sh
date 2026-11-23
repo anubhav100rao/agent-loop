@@ -24,5 +24,11 @@ echo "ok: tracker MCP server lists 3 tools"
 [ "$(cat mock_mcp/comments.json)" = "[]" ] || fail "comments not empty (run scripts/reset.sh)"
 echo "ok: ticket comments empty"
 
-[ -n "$OPENAI_API_KEY" ] || echo "WARN: OPENAI_API_KEY not set (nano_agent.py needs it)"
+$PY -c "import phoenix.otel, openinference.instrumentation.openai" 2>/dev/null || fail "Phoenix deps missing"
+echo "ok: Phoenix deps installed"
+if curl -s -o /dev/null http://127.0.0.1:6006; then echo "ok: Phoenix running at http://127.0.0.1:6006"
+else echo "WARN: Phoenix not running (start scripts/phoenix.sh in another tab)"; fi
+
+[ -n "$OPENAI_API_KEY" ] || echo "WARN: OPENAI_API_KEY not set (plain nano_agent.py needs it)"
+[ -n "$OPENROUTER_API_KEY" ] || echo "WARN: OPENROUTER_API_KEY not set (scripts/nano_phoenix.sh needs it)"
 echo "READY"

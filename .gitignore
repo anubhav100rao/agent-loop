@@ -4,3 +4,4 @@ __pycache__/
 .traces/
 trace.jsonl
 .env
+.phoenix/

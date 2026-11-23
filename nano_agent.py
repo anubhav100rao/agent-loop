@@ -86,4 +86,7 @@ def main():
 
 
 if __name__ == "__main__":
+    if os.environ.get("PHOENIX"):  # optional: trace the loop (tracing.py, faults.py)
+        import faults, tracing
+        faults.inject(globals()); tracing.instrument(globals())
     main()

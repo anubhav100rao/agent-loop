@@ -148,6 +148,75 @@ Expect about 7 requests in 10 s. Point at `sending N messages` growing each requ
 growth, same loop, 89 lines. It runs on an OpenAI model: the loop does
 not care whose model is underneath.
 
+## Observability segment: Phoenix (about 10 min, extends the talk)
+
+Two lenses on the same loop. claude-tap shows **what the model receives**
+(one row per request). Phoenix shows **what the harness does**: a span tree
+of agent run → LLM call → tool run, with timings, tokens and cost.
+
+Before: `scripts/phoenix.sh` running in its own tab, browser on
+http://127.0.0.1:6006 → **nano-agent** project → **Traces** tab.
+`OPENROUTER_API_KEY` set in this shell.
+
+### A. Clean run (3 min)
+
+```bash
+scripts/reset.sh
+SESSION_ID=live-clean scripts/nano_phoenix.sh "The tests in shop/ are failing. Find the bug and fix it."
+```
+
+Refresh **Traces**, click the newest **agent run**.
+
+- Left tree: ChatCompletion, bash, read_file, ... in order. The wrench
+  icons are tool spans. Say: "The proxy saw 5 requests. It never saw these."
+- Click a **bash** span running pytest: Input = the command, Output = the
+  test result, about 1 s. That time is invisible to a request proxy.
+- Click the last **ChatCompletion** → **Info**: the full message list and
+  the 4 tool schemas. Same content as claude-tap, now attached to a step.
+- Top bar: **Total Cost** and **Latency**. Rehearsal: 5 LLM calls,
+  ~7.9k tokens, ~$0.014, 13-20 s.
+
+Point: a trace is the loop drawn as a tree. LLM calls and tool calls take turns.
+
+### B. Break it (4 min)
+
+```bash
+scripts/reset.sh
+FAULT=timeout SESSION_ID=live-broken scripts/nano_phoenix.sh "The tests in shop/ are failing. Find the bug and fix it."
+```
+
+The terminal shows `[fault injected: timeout]`: the first two pytest runs
+return a fake "timed out". The agent still fixes the bug.
+
+- The terminal only says "Fixed... all 5 tests pass." Ask: "Did anything go wrong?"
+- Open the trace: **red ✕ on bash spans**. Click one: the timeout error.
+- Then the agent's detour: it checks `python3`, the `.venv`, plugins...
+- Compare with run A, using rehearsal numbers: **5 → 13 LLM calls, 7.9k → 28.7k
+  tokens, ~3.6x cost**, 4 failed tool spans. The final answer is the same.
+
+Point: the output looked identical. Only the trace shows it cost 3.6x
+and took a detour. With agents, success alone tells you little.
+
+### C. What a trace cannot see (1 min, talk only, no live run)
+
+Rehearsal run `stale-1` (in Phoenix as session **stale-1**): pytest kept
+returning the *old* failure. **Zero red spans** and 48k tokens. The agent
+eventually ran `cat faults.py` and found our fault injection on its own.
+Point: a tool that lies is not an error. Catching it needs evals and
+assertions on tool outputs, not just spans. Do not run `FAULT=stale` live:
+it takes 90 s and its path is not predictable.
+
+### D. Production slide (1 min)
+
+Same spans, more structure: sampling, PII redaction (remember request #1
+had an email in it), evals over traces, session grouping. Phoenix runs
+locally like here. Langfuse self-hosts (Postgres/ClickHouse) or runs as
+a cloud service, with prompt versions and cost dashboards. Both accept
+OpenTelemetry, so the instrumentation does not change.
+
+Backup: `.phoenix/` holds the rehearsal traces (clean-1..3, timeout-1..2,
+stale-1). If the network dies, start `scripts/phoenix.sh` and show those.
+
 ## 14:00-15:00  Close
 
 "You use this daily. This course is about knowing why it works and when
@@ -164,3 +233,6 @@ and watch them coordinate. Hand back to the founders.
 | nano agent errors on model ID | `MODEL=gpt-4.1-mini python nano_agent.py ...` |
 | nano agent says 429 / no credits | add credits at platform.openai.com; walk the code only |
 | Dashboard did not open | open http://127.0.0.1:19527 by hand |
+| `nano_phoenix.sh` says Phoenix not running | start `scripts/phoenix.sh` in another tab |
+| New trace missing in Phoenix | refresh the page; time range top right = Last 7 Days |
+| OpenRouter 402 / 401 | key out of credit or expired (Nov 28); show the `.phoenix/` rehearsal traces |

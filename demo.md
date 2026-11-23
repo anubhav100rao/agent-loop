@@ -24,10 +24,10 @@ cd xray-demo
 uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt
 ```
 
-Add the key to `../.env` (one level above the repo, never committed):
+Create `.env` in the repo from the template (it is git-ignored, never committed):
 
 ```
-OPENROUTER_API_KEY=...    # nano_agent.py via OpenRouter, model openai/gpt-6.2-sol
+cp .env.example .env   # then set OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
 Run `claude` once in this folder to accept the trust dialog and log in.
@@ -50,7 +50,6 @@ The first start downloads Phoenix through `uvx` (about 1 min), so do it early.
 
 ```bash
 cd xray-demo && source .venv/bin/activate
-set -a; . ../.env; set +a
 scripts/reset.sh && scripts/check.sh
 ```
 

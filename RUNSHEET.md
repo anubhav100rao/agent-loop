@@ -7,7 +7,6 @@ Timed cues only. Commands, what to expect and fallbacks are in `demo.md`.
 ```bash
 scripts/phoenix.sh                                   # tab 1, leave running
 cd xray-demo && source .venv/bin/activate            # tab 2
-set -a; . ../.env; set +a
 scripts/reset.sh && scripts/check.sh                 # must print READY
 ```
 

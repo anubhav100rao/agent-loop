@@ -1,6 +1,7 @@
 #!/bin/sh
 # Preflight: deps installed, exactly one test failing, MCP server lists 3 tools.
 cd "$(dirname "$0")/.." || exit 1
+[ -f .env ] && { set -a; . ./.env; set +a; }   # OPENROUTER_API_KEY, MODEL
 PY=.venv/bin/python
 fail() { echo "FAIL: $1"; exit 1; }
 
@@ -28,5 +29,5 @@ echo "ok: Phoenix deps installed"
 if curl -s -o /dev/null http://127.0.0.1:6006; then echo "ok: Phoenix running at http://127.0.0.1:6006"
 else echo "WARN: Phoenix not running (start scripts/phoenix.sh in another tab)"; fi
 
-[ -n "$OPENROUTER_API_KEY" ] || echo "WARN: OPENROUTER_API_KEY not set (scripts/nano_phoenix.sh needs it)"
+[ -n "$OPENROUTER_API_KEY" ] || echo "WARN: OPENROUTER_API_KEY not set (put it in .env, see .env.example)"
 echo "READY"

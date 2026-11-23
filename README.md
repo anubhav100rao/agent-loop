@@ -9,7 +9,7 @@ loop with Phoenix and break it on purpose.
 ```bash
 uv venv .venv && uv pip install --python .venv/bin/python -r requirements.txt
 source .venv/bin/activate
-set -a; . ../.env; set +a      # OPENROUTER_API_KEY (and optionally OPEN_AI_API_KEY)
+cp .env.example .env            # then put your OPENROUTER_API_KEY in .env (git-ignored)
 claude                         # once: accept the trust dialog, /login if asked
 # use a normal terminal, not a shell inside the Claude desktop app
 scripts/check.sh               # must end with READY
@@ -23,7 +23,7 @@ scripts/nano_phoenix.sh "The tests in shop/ are failing. Find the bug and fix it
 FAULT=timeout scripts/nano_phoenix.sh "..."   # first 2 pytest runs fail, agent recovers
 ```
 
-Runs on OpenRouter (`OPENROUTER_API_KEY`, model `openai/gpt-6.2-sol`).
+Runs on OpenRouter; the scripts read `OPENROUTER_API_KEY` and `MODEL` from `.env`.
 `tracing.py` adds the spans; `nano_agent.py` only gets a 3-line hook.
 
 ## Run

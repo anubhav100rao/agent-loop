@@ -87,7 +87,8 @@ scripts/claude_phoenix.sh
 
 This is plain `claude --strict-mcp-config --mcp-config .mcp.json` with Claude
 Code's built-in OpenTelemetry traces (beta) turned on and sent to Phoenix,
-project **claude-code**. Don't mention it yet: you reveal the trace in Act 3.
+project **claude-code**, through `scripts/claude_relay.py` (it makes the spans
+readable and strips your email). Don't mention it yet: you reveal the trace in Act 3.
 
 Type:
 
@@ -216,18 +217,24 @@ took a detour. For agents, "it worked" tells you little.
 Say: *"Remember the Claude Code run from Act 1? It was traced as well."*
 Phoenix → **Projects** → **claude-code** → **Traces** → the newest trace.
 
-- Root span `claude_code.interaction`: the prompt you typed.
-- Children: `claude_code.llm_request` spans (model, tokens, cost) taking turns with
-  `claude_code.tool` spans: `mcp__tracker__get_ticket`, Read, Bash (pytest),
-  Edit, Bash, `mcp__tracker__add_comment`.
-- Same shape as nano-agent's tree. Put the token counts side by side: Claude
-  Code's first LLM request is tens of thousands of tokens; nano-agent's is about 231.
+**Expect** (from the rehearsal run): about 21 spans, 39.7 s, Total Cost about $0.38.
+
+| Click | Show | Say |
+|---|---|---|
+| Root `claude code turn` | Input = the prompt you typed | "Same root as nano-agent's agent run." |
+| Left tree | `claude-opus-5` calls taking turns with ToolSearch, `mcp__tracker__get_ticket`, Bash, Read, Edit, `mcp__tracker__add_comment` | "Same loop, same shape." |
+| First `claude-opus-5` | about 27.5k tokens | Answer the Act 1 guess: nano-agent's first call was about 231 |
+| Last `claude-opus-5` | about 32.6k tokens | Context grows the same way |
+| A `Bash` span (pytest) | Input = command, Output = test result | "The harness ran it, exactly as in our loop." |
+| The small `claude-haiku` call at the top | a side request (housekeeping) | "Not every model call is your task." |
+
+MCP tool spans show no input/output: Claude Code doesn't emit content for MCP
+tools. That's a real limitation of today's telemetry, worth saying out loud.
 
 **Point:** the agent you use every day already emits OpenTelemetry. No code
-changes, just environment variables (see `scripts/claude_phoenix.sh`).
-
-> **Privacy:** Claude Code spans carry your account email and IDs in their
-> **Attributes** tab. Stay on the tree view and the **Info** tab.
+changes: environment variables plus a 186-line relay that maps its span names
+onto what Phoenix understands (`scripts/claude_relay.py`). That mapping step is
+normal in real observability setups.
 
 ### 3.3 What a trace can't see (1 min, talk only)
 
@@ -302,4 +309,5 @@ scripts/check.sh     # must print READY
 | `scripts/phoenix.sh` | Phoenix server (uvx, data in `.phoenix/`) |
 | `scripts/nano_phoenix.sh` | traced agent run on OpenRouter |
 | `scripts/claude_phoenix.sh` | Claude Code with its OpenTelemetry traces sent to Phoenix |
+| `scripts/claude_relay.py` | rewrites Claude Code spans for Phoenix (names, input/output, tokens, no email) |
 | `scripts/reset.sh`, `scripts/check.sh` | reset and preflight |

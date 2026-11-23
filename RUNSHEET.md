@@ -41,7 +41,7 @@ Browser: http://127.0.0.1:6006 → **nano-agent** → **Traces**. Terminal 20pt+
 | 16:00 | A `bash` pytest span: command, output, ~1 s | The harness runs tools; the model only asks |
 | 17:00 | `scripts/reset.sh; FAULT=timeout SESSION_ID=live-broken scripts/nano_phoenix.sh "..."` | Ask: "Did anything go wrong?" |
 | 18:30 | Trace: red ✕ bash spans, the detour; 5 → 13 calls, 7.9k → 28.7k tokens, ~3.6× cost | Same answer, 3.6× cost. "It worked" tells you little |
-| 19:30 | Projects → **claude-code** → the Act 1 trace: llm_request and tool spans (stay off the Attributes tab: it shows your email) | Claude Code already emits OpenTelemetry. Same loop shape |
+| 19:30 | Projects → **claude-code** → the Act 1 trace: `claude-opus-5` calls and named tools; first call ~27.5k tokens vs nano's ~231 | Claude Code already emits OpenTelemetry. Same loop shape |
 | 20:30 | Session **stale-1** (rehearsal): zero red spans, 48k tokens, agent read `faults.py` | A tool that lies is not an error: you need evals |
 | 21:30 | `tracing.py`: register + OpenAIInstrumentor + wrapped tools | It's all OpenTelemetry: Phoenix, Langfuse, any backend |
 | 22:30 | Production slide: sampling, PII redaction, evals over traces, cost per user | |
